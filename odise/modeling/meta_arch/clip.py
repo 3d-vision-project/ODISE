@@ -79,7 +79,7 @@ class ClipAdapter(nn.Module):
 
         # download on local rank 0 first
         if comm.get_local_rank() == 0:
-            open_clip.create_model_and_transforms(name, pretrained="openai")
+            open_clip.create_model_and_transforms(name, pretrained="openai", cache_dir='cache')
         comm.synchronize()
 
         # checked, the same as openai original CLIP

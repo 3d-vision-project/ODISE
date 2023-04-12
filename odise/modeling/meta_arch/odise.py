@@ -186,6 +186,8 @@ class CategoryODISE(ODISE):
         # [1, C]
         text_embed = outputs["text_embed"]
         null_embed = outputs["null_embed"]
+        print(mask_embed.shape)
+        print(text_embed.shape)
 
         labels = outputs["labels"]
 
@@ -330,11 +332,13 @@ class CategoryODISE(ODISE):
                 align_corners=False,
             )
 
+            mask_embeds = outputs["mask_embed"]
+
             del outputs
 
             processed_results = []
-            for mask_cls_result, mask_pred_result, input_per_image, image_size in zip(
-                mask_cls_results, mask_pred_results, batched_inputs, images.image_sizes
+            for mask_cls_result, mask_pred_result, input_per_image, image_size, mask_embed in zip(
+                mask_cls_results, mask_pred_results, batched_inputs, images.image_sizes, mask_embeds
             ):
                 height = input_per_image.get("height", image_size[0])
                 width = input_per_image.get("width", image_size[1])
@@ -368,6 +372,11 @@ class CategoryODISE(ODISE):
                         mask_cls_result, mask_pred_result
                     )
                     processed_results[-1]["instances"] = instance_r
+
+                # clip feature map
+                processed_results[-1]["clip_map"] = mask_embed[mask_pred_result.argmax(0)]
+
+                
 
             return processed_results
 
@@ -577,11 +586,14 @@ class CaptionODISE(ODISE):
                 align_corners=False,
             )
 
+            mask_embeds = outputs["mask_embed"]
+
+
             del outputs
 
             processed_results = []
-            for mask_cls_result, mask_pred_result, input_per_image, image_size in zip(
-                mask_cls_results, mask_pred_results, batched_inputs, images.image_sizes
+            for mask_cls_result, mask_pred_result, input_per_image, image_size, mask_embed in zip(
+                mask_cls_results, mask_pred_results, batched_inputs, images.image_sizes, mask_embeds
             ):
                 height = input_per_image.get("height", image_size[0])
                 width = input_per_image.get("width", image_size[1])
@@ -615,6 +627,9 @@ class CaptionODISE(ODISE):
                         mask_cls_result, mask_pred_result
                     )
                     processed_results[-1]["instances"] = instance_r
+
+                # clip feature map
+                processed_results[-1]["clip_map"] = mask_embed[mask_pred_result.argmax(0)]
 
             return processed_results
 
@@ -1535,7 +1550,7 @@ class PoolingCLIPHead(WordEmbed):
 
         pred_open_logits = pred_open_logits_base + pred_open_logits_novel
 
-        ret = {"pred_open_logits": pred_open_logits}
+        ret = {**clip_results, "pred_open_logits": pred_open_logits}
         if "labels" in outputs:
             ret["labels"] = labels
 

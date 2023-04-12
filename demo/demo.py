@@ -133,6 +133,17 @@ def get_nouns(caption, with_preposition):
 
     return continuous_chunk
 
+def pca_feat_map(f):
+    # x: H, W, D
+    H, W, D = f.shape
+    a = f.reshape(-1, D)
+    u,s,v = torch.pca_lowrank(a, q=3)
+    f_pca = (a @ v[..., :3]).reshape(H, W, 3)
+    return f_pca
+
+def norm_img(f):
+    m1, m2 = f.min(), f.max()
+    return (f - m1)/(m2-m1)
 
 class VisualizationDemo(object):
     def __init__(self, model, metadata, aug, instance_mode=ColorMode.IMAGE):
@@ -288,6 +299,10 @@ if __name__ == "__main__":
         "If not given, will show output in an OpenCV window.",
     )
     parser.add_argument(
+        "--output-clip",
+        help="A file or directory to save output clip visualizations. "
+    )
+    parser.add_argument(
         "--vocab",
         help="extra vocabulary, in format 'a1,a2;b1,b2',"
         "where a1,a2 are synonyms vocabularies for the first class"
@@ -298,7 +313,7 @@ if __name__ == "__main__":
         help="label set to use, could be multiple options from 'COCO', 'ADE' and 'LVIS'.",
         choices=["COCO", "ADE", "LVIS", ""],
         nargs="+",
-        default=["COCO", "ADE", "LVIS"],
+        default=[],
     )
     parser.add_argument("--caption", help="caption contains nouns (noun phrases) to be segmented")
     parser.add_argument(
@@ -428,6 +443,11 @@ if __name__ == "__main__":
                     cv2.imshow(WINDOW_NAME, visualized_output.get_image()[:, :, ::-1])
                     if cv2.waitKey(0) == 27:
                         break  # esc to quit
+
+                if args.output_clip:
+                    clip_map = predictions['clip_map']
+                    rgb = norm_img(pca_feat_map(clip_map)) * 255.
+                    cv2.imwrite(args.output_clip, rgb.cpu().numpy())
         elif args.webcam:
             assert args.input is None, "Cannot have both --input and --webcam!"
             assert args.output is None, "output not yet supported with --webcam!"

@@ -445,9 +445,12 @@ if __name__ == "__main__":
                         break  # esc to quit
 
                 if args.output_clip:
+                    pca_filename = os.path.join(args.output_clip, os.path.basename(path).replace('rgb', 'clip_pca'))
+                    clip_filename = os.path.join(args.output_clip, os.path.basename(path).replace('rgb', 'clip').split('.')[0] + '.pt')
                     clip_map = predictions['clip_map']
-                    rgb = norm_img(pca_feat_map(clip_map)) * 255.
-                    cv2.imwrite(args.output_clip, rgb.cpu().numpy())
+                    clip_map_pca = norm_img(pca_feat_map(clip_map)) * 255.
+                    cv2.imwrite(pca_filename, clip_map_pca.detach().cpu().numpy())
+                    torch.save(clip_map.detach().cpu(), clip_filename)
         elif args.webcam:
             assert args.input is None, "Cannot have both --input and --webcam!"
             assert args.output is None, "output not yet supported with --webcam!"

@@ -374,7 +374,8 @@ class CategoryODISE(ODISE):
                     processed_results[-1]["instances"] = instance_r
 
                 # clip feature map
-                processed_results[-1]["clip_map"] = mask_embed[mask_pred_result.argmax(0)]
+                # processed_results[-1]["clip_map"] = mask_embed[mask_pred_result.argmax(0)]
+                processed_results[-1]["clip_map"] = torch.einsum('mhw,md->hwd', mask_pred_result.softmax(dim=0), mask_embed)
 
                 
 
@@ -629,7 +630,8 @@ class CaptionODISE(ODISE):
                     processed_results[-1]["instances"] = instance_r
 
                 # clip feature map
-                processed_results[-1]["clip_map"] = mask_embed[mask_pred_result.argmax(0)]
+                # processed_results[-1]["clip_map"] = mask_embed[mask_pred_result.argmax(0)]
+                processed_results[-1]["clip_map"] = torch.einsum('mhw,md->hwd', mask_pred_result.softmax(dim=0), mask_embed)
 
             return processed_results
 

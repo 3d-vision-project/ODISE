@@ -32,7 +32,7 @@ import torch
 import tqdm
 from detectron2.config import LazyConfig, instantiate
 from detectron2.data import MetadataCatalog
-from detectron2.data import detection_utils as utils
+import utils
 from detectron2.data import transforms as T
 from detectron2.data.datasets.builtin_meta import COCO_CATEGORIES
 from detectron2.engine import create_ddp_model
@@ -327,6 +327,12 @@ if __name__ == "__main__":
         default=None,
         nargs=argparse.REMAINDER,
     )
+    parser.add_argument(
+        "--rescale",
+        type=float,
+        default=1.0,
+        help="rescale the input image before segmentation",
+    )
     args = parser.parse_args()
 
     setup_logger()
@@ -422,7 +428,7 @@ if __name__ == "__main__":
                 assert args.input, "The input path(s) was not found"
             for path in tqdm.tqdm(args.input, disable=not args.output):
                 # use PIL, to be consistent with evaluation
-                img = utils.read_image(path, format="RGB")
+                img, remap = utils.read_image(path, format="RGB", rescale=args.rescale)
                 start_time = time.time()
                 predictions, visualized_output = demo.run_on_image(img)
                 logger.info(
@@ -451,13 +457,18 @@ if __name__ == "__main__":
                 if args.output_clip:
                     os.makedirs(args.output_clip, exist_ok=True)
                     pca_filename = os.path.join(args.output_clip, os.path.basename(path).replace(args.input_name, 'clip_pca'))
+                    pca_remap_filename = os.path.join(args.output_clip, os.path.basename(path).replace(args.input_name, 'clip_pca_remap'))
                     clip_filename = os.path.join(args.output_clip, os.path.basename(path).replace(args.input_name, 'clip').split('.')[0] + '.pt')
                     clip_map = predictions['clip_map']
-                    clip_map_pca = norm_img(pca_feat_map(clip_map)) * 255.
+                    clip_map_pca = norm_img(pca_feat_map(clip_map)) * 255. # (H, W, 3)
+                    clip_map_remap = remap(clip_map_pca)
                     cv2.imwrite(pca_filename, clip_map_pca.detach().cpu().numpy())
+                    cv2.imwrite(pca_remap_filename, clip_map_remap.detach().cpu().numpy())
 
+                    masks = predictions['mask_pred_result'] # (N, H, W)
+                    masks = remap(masks.permute(1, 2, 0)).permute(2, 0, 1)
                     outputs = {
-                        "masks": predictions['mask_pred_result'],
+                        "masks": masks,
                         "mask_embeds": predictions['mask_embed'],
                         # "sem_seg": predictions.get("sem_seg", None),
                         # "panoptic_seg": predictions.get("panoptic_seg", None),

@@ -303,6 +303,11 @@ if __name__ == "__main__":
         help="A file or directory to save output clip visualizations. "
     )
     parser.add_argument(
+        "--input-name",
+        help="",
+        default="rgb",
+    )
+    parser.add_argument(
         "--vocab",
         help="extra vocabulary, in format 'a1,a2;b1,b2',"
         "where a1,a2 are synonyms vocabularies for the first class"
@@ -431,12 +436,11 @@ if __name__ == "__main__":
                 )
 
                 if args.output:
-                    if os.path.isdir(args.output):
-                        assert os.path.isdir(args.output), args.output
-                        out_filename = os.path.join(args.output, os.path.basename(path))
-                    else:
-                        assert len(args.input) == 1, "Please specify a directory with args.output"
+                    if len(args.input) == 1:
                         out_filename = args.output
+                    else:
+                        os.makedirs(args.output, exist_ok=True)
+                        out_filename = os.path.join(args.output, os.path.basename(path))
                     visualized_output.save(out_filename)
                 else:
                     cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
@@ -445,12 +449,22 @@ if __name__ == "__main__":
                         break  # esc to quit
 
                 if args.output_clip:
-                    pca_filename = os.path.join(args.output_clip, os.path.basename(path).replace('rgb', 'clip_pca'))
-                    clip_filename = os.path.join(args.output_clip, os.path.basename(path).replace('rgb', 'clip').split('.')[0] + '.pt')
+                    os.makedirs(args.output_clip, exist_ok=True)
+                    pca_filename = os.path.join(args.output_clip, os.path.basename(path).replace(args.input_name, 'clip_pca'))
+                    clip_filename = os.path.join(args.output_clip, os.path.basename(path).replace(args.input_name, 'clip').split('.')[0] + '.pt')
                     clip_map = predictions['clip_map']
                     clip_map_pca = norm_img(pca_feat_map(clip_map)) * 255.
                     cv2.imwrite(pca_filename, clip_map_pca.detach().cpu().numpy())
-                    torch.save(clip_map.detach().cpu(), clip_filename)
+
+                    outputs = {
+                        "masks": predictions['mask_pred_result'],
+                        "mask_embeds": predictions['mask_embed'],
+                        # "sem_seg": predictions.get("sem_seg", None),
+                        # "panoptic_seg": predictions.get("panoptic_seg", None),
+                        # "instances": predictions.get("instances", None),
+                    }
+                    outputs = {k: v.detach().cpu() for k, v in outputs.items()}
+                    torch.save(outputs, clip_filename)
         elif args.webcam:
             assert args.input is None, "Cannot have both --input and --webcam!"
             assert args.output is None, "output not yet supported with --webcam!"
